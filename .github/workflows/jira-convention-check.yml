@@ -2,9 +2,13 @@ name: Jira Convention Check
 
 on:
   pull_request:
+    types: [opened, edited, synchronize, reopened]
     branches:
       - develop
       - master
+
+permissions:
+  pull-requests: write
 
 jobs:
   jira-convention-check:
@@ -12,10 +16,12 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Validate branch name and PR title
+      - name: Validate and Auto-fix PR title
         env:
           BRANCH_NAME: ${{ github.head_ref }}
           PR_TITLE: ${{ github.event.pull_request.title }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           echo "Validating Jira naming convention..."
           echo "Branch: $BRANCH_NAME"
@@ -24,28 +30,10 @@ jobs:
           BRANCH_REGEX='^(feature|bugfix|hotfix|chore|refactor)\/BMS-[0-9]+-[a-z0-9]+(-[a-z0-9]+)*$'
           PR_TITLE_REGEX='^BMS-[0-9]+ .+$'
 
-          BRANCH_OK=true
-          TITLE_OK=true
-
+          # Validate branch name
           if [[ ! "$BRANCH_NAME" =~ $BRANCH_REGEX ]]; then
-            BRANCH_OK=false
-          fi
-
-          if [[ ! "$PR_TITLE" =~ $PR_TITLE_REGEX ]]; then
-            TITLE_OK=false
-          fi
-
-          if [[ "$BRANCH_OK" == "true" && "$TITLE_OK" == "true" ]]; then
-            echo "Convention check passed."
-            exit 0
-          fi
-
-          echo ""
-          echo "ERROR: This pull request does not meet the required Jira naming convention."
-          echo ""
-
-          if [[ "$BRANCH_OK" == "false" ]]; then
-            echo "Invalid branch name: $BRANCH_NAME"
+            echo ""
+            echo "ERROR: Invalid branch name: $BRANCH_NAME"
             echo "Expected format:"
             echo "  feature/BMS-123-short-description"
             echo "  bugfix/BMS-123-short-description"
@@ -53,21 +41,39 @@ jobs:
             echo "  chore/BMS-123-short-description"
             echo "  refactor/BMS-123-short-description"
             echo ""
+            echo "Why this is required:"
+            echo "- Jira needs the issue key in the branch name to link development activity correctly."
+            echo "- The expected issue key format is: BMS-<number>"
+            exit 1
           fi
 
-          if [[ "$TITLE_OK" == "false" ]]; then
-            echo "Invalid PR title: $PR_TITLE"
-            echo "Expected format:"
-            echo "  BMS-123 Short human readable title"
-            echo ""
+          # Extract Jira key and description from branch name
+          JIRA_KEY=$(echo "$BRANCH_NAME" | grep -oP 'BMS-[0-9]+')
+          DESCRIPTION=$(echo "$BRANCH_NAME" | sed -E 's/^(feature|bugfix|hotfix|chore|refactor)\/BMS-[0-9]+-//' | tr '-' ' ' | sed 's/\b\(.\)/\u\1/g')
+
+          EXPECTED_TITLE="$JIRA_KEY $DESCRIPTION"
+
+          echo "Extracted Jira Key: $JIRA_KEY"
+          echo "Expected Title: $EXPECTED_TITLE"
+
+          # Check if PR title is valid
+          if [[ "$PR_TITLE" =~ $PR_TITLE_REGEX ]]; then
+            echo "✓ PR title follows convention."
+            exit 0
           fi
 
-          echo "Why this is required:"
-          echo "- Jira needs the issue key in the branch or PR title to link development activity correctly."
-          echo "- The expected issue key format is: BMS-<number>"
+          # Auto-fix PR title
           echo ""
-          echo "Examples:"
-          echo "- Branch: feature/BMS-10216-create-backend-architecture"
-          echo "- PR Title: BMS-10216 Create backend architecture"
+          echo "PR title does not follow convention. Auto-fixing..."
+          echo "Old title: $PR_TITLE"
+          echo "New title: $EXPECTED_TITLE"
 
-          exit 1
+          # Update PR title using GitHub API
+          curl -X PATCH \
+            -H "Accept: application/vnd.github.v3+json" \
+            -H "Authorization: token $GITHUB_TOKEN" \
+            "https://api.github.com/repos/${{ github.repository }}/pulls/$PR_NUMBER" \
+            -d "{\"title\":\"$EXPECTED_TITLE\"}"
+
+          echo ""
+          echo "✓ PR title has been automatically updated to: $EXPECTED_TITLE"
