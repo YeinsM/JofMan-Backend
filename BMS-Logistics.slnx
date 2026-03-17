@@ -1,1 +1,6 @@
-<Solution />
+<Solution>
+  <Project Path="BMS-Logistics.API/BMS-Logistics.API.csproj" />
+  <Project Path="BMS-Logistics.Application/BMS-Logistics.Application.csproj" />
+  <Project Path="BMS-Logistics.Domain/BMS-Logistics.Domain.csproj" />
+  <Project Path="BMS-Logistics.Infrastructure/BMS-Logistics.Infrastructure.csproj" />
+</Solution>
