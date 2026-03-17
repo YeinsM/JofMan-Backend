@@ -1,0 +1,62 @@
+name: Backend CD
+
+on:
+  push:
+    branches:
+      - develop
+      - master
+
+jobs:
+  deploy-staging:
+    name: deploy-backend-staging
+    if: github.ref == 'refs/heads/develop'
+    runs-on: ubuntu-latest
+    environment: staging
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup .NET 10
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Restore dependencies
+        run: dotnet restore
+
+      - name: Build solution
+        run: dotnet build --configuration Release --no-restore
+
+      - name: Publish application
+        run: dotnet publish --configuration Release --output ./publish
+
+      - name: Deploy to staging
+        run: echo "Deploy backend to STAGING here"
+
+  deploy-production:
+    name: deploy-backend-production
+    if: github.ref == 'refs/heads/master'
+    runs-on: ubuntu-latest
+    environment: production
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup .NET 10
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Restore dependencies
+        run: dotnet restore
+
+      - name: Build solution
+        run: dotnet build --configuration Release --no-restore
+
+      - name: Publish application
+        run: dotnet publish --configuration Release --output ./publish
+
+      - name: Deploy to production
+        run: echo "Deploy backend to PRODUCTION here"

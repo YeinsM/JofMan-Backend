@@ -1,0 +1,73 @@
+name: Jira Convention Check
+
+on:
+  pull_request:
+    branches:
+      - develop
+      - master
+
+jobs:
+  jira-convention-check:
+    name: jira-convention-check
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Validate branch name and PR title
+        env:
+          BRANCH_NAME: ${{ github.head_ref }}
+          PR_TITLE: ${{ github.event.pull_request.title }}
+        run: |
+          echo "Validating Jira naming convention..."
+          echo "Branch: $BRANCH_NAME"
+          echo "PR Title: $PR_TITLE"
+
+          BRANCH_REGEX='^(feature|bugfix|hotfix|chore|refactor)\/BMS-[0-9]+-[a-z0-9]+(-[a-z0-9]+)*$'
+          PR_TITLE_REGEX='^BMS-[0-9]+ .+$'
+
+          BRANCH_OK=true
+          TITLE_OK=true
+
+          if [[ ! "$BRANCH_NAME" =~ $BRANCH_REGEX ]]; then
+            BRANCH_OK=false
+          fi
+
+          if [[ ! "$PR_TITLE" =~ $PR_TITLE_REGEX ]]; then
+            TITLE_OK=false
+          fi
+
+          if [[ "$BRANCH_OK" == "true" && "$TITLE_OK" == "true" ]]; then
+            echo "Convention check passed."
+            exit 0
+          fi
+
+          echo ""
+          echo "ERROR: This pull request does not meet the required Jira naming convention."
+          echo ""
+
+          if [[ "$BRANCH_OK" == "false" ]]; then
+            echo "Invalid branch name: $BRANCH_NAME"
+            echo "Expected format:"
+            echo "  feature/BMS-123-short-description"
+            echo "  bugfix/BMS-123-short-description"
+            echo "  hotfix/BMS-123-short-description"
+            echo "  chore/BMS-123-short-description"
+            echo "  refactor/BMS-123-short-description"
+            echo ""
+          fi
+
+          if [[ "$TITLE_OK" == "false" ]]; then
+            echo "Invalid PR title: $PR_TITLE"
+            echo "Expected format:"
+            echo "  BMS-123 Short human readable title"
+            echo ""
+          fi
+
+          echo "Why this is required:"
+          echo "- Jira needs the issue key in the branch or PR title to link development activity correctly."
+          echo "- The expected issue key format is: BMS-<number>"
+          echo ""
+          echo "Examples:"
+          echo "- Branch: feature/BMS-10216-create-backend-architecture"
+          echo "- PR Title: BMS-10216 Create backend architecture"
+
+          exit 1
